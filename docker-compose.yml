@@ -1,0 +1,125 @@
+# MittelstandGPT — self-hosted, GDPR-compliant RAG assistant.
+# Everything runs locally: no cloud, no external API calls.
+# Start the whole stack with a single command:  docker compose up
+#
+# Model names and connection URLs are configurable via environment
+# variables (see .env.example) so the LLM/embedding model can be swapped
+# without touching the code.
+
+services:
+  # ---- Local LLM runtime (text generation + embeddings) ----
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mittelstandgpt-ollama
+    # No host port published: Ollama is reached internally as http://ollama:11434.
+    # (Keeps it off the host network and avoids clashing with a native Ollama.)
+    expose:
+      - "11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - mittelstand-net
+    healthcheck:
+      # `ollama list` returns 0 once the daemon is serving.
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  # ---- Vector database ----
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mittelstandgpt-qdrant
+    ports:
+      - "6333:6333" # REST API + dashboard
+      - "6334:6334" # gRPC API (used by Spring AI)
+    environment:
+      # Disable Qdrant's anonymized usage telemetry — nothing leaves the server.
+      QDRANT__TELEMETRY_DISABLED: "true"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - mittelstand-net
+    healthcheck:
+      # The Qdrant image ships without curl/wget, but includes bash.
+      # A successful TCP connect to the REST port means it is serving.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  # ---- Backend: Spring Boot REST API (RAG orchestration) ----
+  backend:
+    build:
+      context: ./backend
+      # Build over the host network so package downloads (Maven Central) work
+      # even when the Docker bridge cannot resolve DNS during build.
+      network: host
+    container_name: mittelstandgpt-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      # Ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:3b-instruct}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      # Qdrant
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6334
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-mittelstandgpt}
+    depends_on:
+      ollama:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    networks:
+      - mittelstand-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+
+  # ---- Frontend: React + Vite dev server (hot reload via bind mount) ----
+  frontend:
+    build:
+      context: ./frontend
+      # See backend: host network avoids bridge-DNS issues for npm install.
+      network: host
+    container_name: mittelstandgpt-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      # Vite proxies /api → backend (see vite.config.ts)
+      BACKEND_URL: http://backend:8080
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # keep container's installed deps
+    depends_on:
+      - backend
+    networks:
+      - mittelstand-net
+    healthcheck:
+      # Use 127.0.0.1 (not localhost): inside the container localhost resolves to
+      # ::1 first, but the Vite dev server binds IPv4 0.0.0.0 only.
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:5173/ > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  qdrant_data:
+
+networks:
+  mittelstand-net:
+    driver: bridge

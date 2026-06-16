@@ -1,0 +1,36 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: mittelstandgpt
+  servlet:
+    multipart:
+      # Generous limits for document uploads (Phase 2)
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+# Actuator: only expose health/info. Used by the Docker healthcheck.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+# --- Application configuration (consumed from Phase 1 onwards) ---
+# All values are overridable via environment variables so the models and
+# infrastructure endpoints can be swapped without code changes.
+app:
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:3b-instruct}
+    embedding-model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+  qdrant:
+    host: ${QDRANT_HOST:localhost}
+    port: ${QDRANT_PORT:6334}
+    collection: ${QDRANT_COLLECTION:mittelstandgpt}
