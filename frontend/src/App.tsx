@@ -5,11 +5,14 @@ import { EmptyState } from './components/EmptyState'
 import { MessageList } from './components/MessageList'
 import { TopBar } from './components/TopBar'
 import { useTheme } from './hooks/useTheme'
-import { fetchDocuments, streamChat } from './lib/api'
+import { fetchDocuments, streamChat, uploadDocument } from './lib/api'
 import type { DocumentInfo, Message } from './lib/types'
 
 let idCounter = 0
 const nextId = () => `m${Date.now()}-${idCounter++}`
+
+const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt']
+const MAX_FILE_BYTES = 50 * 1024 * 1024 // matches the backend multipart limit
 
 export default function App() {
   const { theme, toggle } = useTheme()
@@ -20,6 +23,8 @@ export default function App() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
   const [docsError, setDocsError] = useState<string | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const shellRef = useRef<HTMLDivElement>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
@@ -71,6 +76,39 @@ export default function App() {
     setDocsOpen(true)
     loadDocuments()
   }
+
+  const handleUpload = useCallback(
+    async (files: File[]) => {
+      setUploadError(null)
+      const accepted: File[] = []
+      const rejected: string[] = []
+      for (const file of files) {
+        const okType = ACCEPTED_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
+        if (!okType) rejected.push(`${file.name} (Format)`)
+        else if (file.size > MAX_FILE_BYTES) rejected.push(`${file.name} (zu groß, max. 50 MB)`)
+        else accepted.push(file)
+      }
+      if (rejected.length) {
+        setUploadError(
+          `Übersprungen: ${rejected.join(', ')}. Erlaubt sind PDF, DOCX und TXT (max. 50 MB).`,
+        )
+      }
+      if (accepted.length === 0) return
+
+      try {
+        for (const file of accepted) {
+          setUploadStatus(`„${file.name}“ wird analysiert …`)
+          await uploadDocument(file)
+        }
+        await loadDocuments()
+      } catch (error) {
+        setUploadError((error as Error).message)
+      } finally {
+        setUploadStatus(null)
+      }
+    },
+    [loadDocuments],
+  )
 
   const patchMessage = (id: string, patch: Partial<Message>) =>
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)))
@@ -144,6 +182,9 @@ export default function App() {
         documents={documents}
         loading={docsLoading}
         error={docsError}
+        onUpload={handleUpload}
+        uploadStatus={uploadStatus}
+        uploadError={uploadError}
       />
     </div>
   )
