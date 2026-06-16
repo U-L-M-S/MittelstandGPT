@@ -10,6 +10,29 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
 
+  # --- Spring AI: all wired to the local Ollama + Qdrant containers ---
+  # Every endpoint/model is overridable via environment variables so the
+  # infrastructure and models can be swapped without code changes.
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      init:
+        # Models are pulled by the ollama-init container, never at app startup.
+        pull-model-strategy: never
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:qwen2.5:3b-instruct}
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      qdrant:
+        host: ${QDRANT_HOST:localhost}
+        port: ${QDRANT_PORT:6334} # gRPC port
+        collection-name: ${QDRANT_COLLECTION:mittelstandgpt}
+        initialize-schema: true # create the collection on startup if missing
+        use-tls: false
+
 # Actuator: only expose health/info. Used by the Docker healthcheck.
 management:
   endpoints:
@@ -22,15 +45,9 @@ management:
         enabled: true
       show-details: never
 
-# --- Application configuration (consumed from Phase 1 onwards) ---
-# All values are overridable via environment variables so the models and
-# infrastructure endpoints can be swapped without code changes.
+# Application-specific settings.
 app:
-  ollama:
-    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
-    chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:3b-instruct}
-    embedding-model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
   qdrant:
-    host: ${QDRANT_HOST:localhost}
-    port: ${QDRANT_PORT:6334}
-    collection: ${QDRANT_COLLECTION:mittelstandgpt}
+    # Qdrant REST endpoint (separate from the gRPC port used by the vector
+    # store) — used by the /api/health/ai connectivity check.
+    rest-url: http://${QDRANT_HOST:localhost}:6333
