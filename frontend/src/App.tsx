@@ -1,62 +1,150 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Composer } from './components/Composer'
+import { DocsDrawer } from './components/DocsDrawer'
+import { EmptyState } from './components/EmptyState'
+import { MessageList } from './components/MessageList'
+import { TopBar } from './components/TopBar'
+import { useTheme } from './hooks/useTheme'
+import { fetchDocuments, streamChat } from './lib/api'
+import type { DocumentInfo, Message } from './lib/types'
 
-type BackendStatus = 'checking' | 'online' | 'offline'
+let idCounter = 0
+const nextId = () => `m${Date.now()}-${idCounter++}`
 
-/**
- * Phase 0 placeholder page. It verifies the full chain
- * (browser → Vite proxy → backend) by polling /api/health.
- * The real chat UI replaces this in Phase 4.
- */
 export default function App() {
-  const [status, setStatus] = useState<BackendStatus>('checking')
+  const { theme, toggle } = useTheme()
+  const [messages, setMessages] = useState<Message[]>([])
+  const [busy, setBusy] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
+  const [docsOpen, setDocsOpen] = useState(false)
+  const [documents, setDocuments] = useState<DocumentInfo[]>([])
+  const [docsLoading, setDocsLoading] = useState(false)
+  const [docsError, setDocsError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
 
-  useEffect(() => {
-    // Respect the OS dark/light preference (full toggle comes in Phase 4).
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.classList.toggle('dark', prefersDark)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    const check = async () => {
-      try {
-        const res = await fetch('/api/health')
-        if (!cancelled) setStatus(res.ok ? 'online' : 'offline')
-      } catch {
-        if (!cancelled) setStatus('offline')
-      }
-    }
-    check()
-    const id = setInterval(check, 5000)
-    return () => {
-      cancelled = true
-      clearInterval(id)
+  const loadDocuments = useCallback(async () => {
+    setDocsLoading(true)
+    setDocsError(null)
+    try {
+      setDocuments(await fetchDocuments())
+    } catch (error) {
+      setDocsError((error as Error).message)
+    } finally {
+      setDocsLoading(false)
     }
   }, [])
 
-  const badge = {
-    checking: { text: 'Verbindung wird geprüft …', color: 'bg-amber-400' },
-    online: { text: 'Backend verbunden', color: 'bg-emerald-500' },
-    offline: { text: 'Backend nicht erreichbar', color: 'bg-rose-500' },
-  }[status]
+  useEffect(() => {
+    loadDocuments()
+  }, [loadDocuments])
+
+  // Abort any in-flight stream if the app unmounts.
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  // Esc closes the documents drawer.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDocsOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Dialog behaviour: make the background inert while the drawer is open, move
+  // focus into the drawer, and restore it to the trigger when it closes.
+  useEffect(() => {
+    const shell = shellRef.current
+    if (docsOpen) {
+      restoreFocusRef.current = (document.activeElement as HTMLElement) ?? null
+      if (shell) shell.inert = true
+      document.getElementById('docs-drawer')?.focus()
+    } else {
+      if (shell) shell.inert = false
+      restoreFocusRef.current?.focus()
+      restoreFocusRef.current = null
+    }
+  }, [docsOpen])
+
+  const openDocs = () => {
+    setDocsOpen(true)
+    loadDocuments()
+  }
+
+  const patchMessage = (id: string, patch: Partial<Message>) =>
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)))
+
+  const send = useCallback(
+    async (text: string) => {
+      if (busy) return
+      const assistantId = nextId()
+      setMessages((prev) => [
+        ...prev,
+        { id: nextId(), role: 'user', content: text },
+        { id: assistantId, role: 'assistant', content: '', streaming: true },
+      ])
+      setBusy(true)
+      setAnnouncement('Antwort wird erstellt …')
+
+      const controller = new AbortController()
+      abortRef.current = controller
+      let answer = ''
+
+      await streamChat(text, {
+        signal: controller.signal,
+        onToken: (token) => {
+          answer += token
+          patchMessage(assistantId, { content: answer })
+        },
+        onSources: (sources) => patchMessage(assistantId, { sources }),
+        onError: (message) => {
+          if (answer.length === 0) answer = message
+          patchMessage(assistantId, { content: answer, error: answer === message })
+        },
+      })
+
+      patchMessage(assistantId, { streaming: false })
+      setAnnouncement(answer)
+      setBusy(false)
+      abortRef.current = null
+    },
+    [busy],
+  )
+
+  const stop = () => abortRef.current?.abort()
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="text-2xl font-semibold tracking-tight">MittelstandGPT</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Selbst-gehosteter, DSGVO-konformer Wissensassistent
-        </p>
+    <div className="h-full">
+      <div
+        ref={shellRef}
+        className="flex h-full flex-col bg-slate-50 font-sans text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100"
+      >
+        <TopBar theme={theme} onToggleTheme={toggle} onOpenDocs={openDocs} docCount={documents.length} />
 
-        <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm dark:bg-slate-800">
-          <span className={`h-2.5 w-2.5 rounded-full ${badge.color}`} />
-          {badge.text}
-        </div>
+        <main className="scrollbar-soft flex-1 overflow-y-auto">
+          {messages.length === 0 ? (
+            <EmptyState onPick={send} />
+          ) : (
+            <MessageList messages={messages} onSelectSource={openDocs} />
+          )}
+        </main>
 
-        <p className="mt-6 text-xs text-slate-400 dark:text-slate-500">
-          Phase 0 — Grundgerüst läuft. Chat &amp; Upload folgen in den nächsten Phasen.
-        </p>
+        <Composer onSend={send} onStop={stop} busy={busy} />
       </div>
+
+      {/* Announces the completed answer to screen readers (not per token). */}
+      <div aria-live="polite" role="status" className="sr-only">
+        {announcement}
+      </div>
+
+      <DocsDrawer
+        open={docsOpen}
+        onClose={() => setDocsOpen(false)}
+        documents={documents}
+        loading={docsLoading}
+        error={docsError}
+      />
     </div>
   )
 }

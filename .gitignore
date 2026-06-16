@@ -31,3 +31,7 @@ yarn-error.log*
 # ---- Docker / runtime data ----
 ollama_data/
 qdrant_data/
+
+# ---- Test/verification artifacts ----
+.playwright-mcp/
+/*.png

@@ -1,17 +1,71 @@
+/* Self-hosted font (no external request — GDPR-safe, nothing leaves the server) */
+@import '@fontsource-variable/plus-jakarta-sans';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light dark;
+@layer base {
+  :root {
+    color-scheme: light;
+    --accent: 13 148 136; /* teal-600 — borders, rings, decorative icons */
+    --accent-text: 15 118 110; /* teal-700 — accent TEXT (AA on light surfaces) */
+    --accent-solid: 15 118 110; /* teal-700 — solid bg under white text (AA, both themes) */
+  }
+
+  .dark {
+    color-scheme: dark;
+    --accent: 45 212 191; /* teal-400 — brighter for contrast on dark */
+    --accent-text: 45 212 191; /* teal-400 — AA on dark surfaces */
+    /* --accent-solid intentionally stays teal-700 so white text keeps AA contrast */
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
 }
 
-html,
-body,
-#root {
-  height: 100%;
+@layer utilities {
+  .text-accent {
+    color: rgb(var(--accent));
+  }
+  .text-accent-strong {
+    color: rgb(var(--accent-text));
+  }
+  .bg-accent {
+    background-color: rgb(var(--accent));
+  }
+  .bg-accent-solid {
+    background-color: rgb(var(--accent-solid));
+  }
+  .border-accent {
+    border-color: rgb(var(--accent));
+  }
+  .ring-accent {
+    --tw-ring-color: rgb(var(--accent));
+  }
 }
 
-body {
-  margin: 0;
+/* Quiet, thin scrollbar that fits the calm aesthetic */
+.scrollbar-soft {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.35) transparent;
+}
+.scrollbar-soft::-webkit-scrollbar {
+  width: 8px;
+}
+.scrollbar-soft::-webkit-scrollbar-thumb {
+  background-color: rgb(148 163 184 / 0.35);
+  border-radius: 9999px;
+}
+.scrollbar-soft::-webkit-scrollbar-track {
+  background: transparent;
 }
