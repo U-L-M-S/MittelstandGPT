@@ -142,8 +142,9 @@ export default function App() {
         },
       })
 
-      patchMessage(assistantId, { streaming: false })
-      setAnnouncement(answer)
+      const wasAborted = controller.signal.aborted
+      patchMessage(assistantId, { streaming: false, aborted: wasAborted })
+      setAnnouncement(wasAborted ? 'Antwort abgebrochen.' : answer)
       setBusy(false)
       abortRef.current = null
     },
@@ -162,7 +163,7 @@ export default function App() {
 
         <main className="scrollbar-soft flex-1 overflow-y-auto">
           {messages.length === 0 ? (
-            <EmptyState onPick={send} />
+            <EmptyState onPick={send} docCount={documents.length} />
           ) : (
             <MessageList messages={messages} onSelectSource={openDocs} />
           )}

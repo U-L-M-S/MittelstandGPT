@@ -12,6 +12,7 @@ export interface Message {
   sources?: Source[]
   streaming?: boolean
   error?: boolean
+  aborted?: boolean
 }
 
 export interface DocumentInfo {

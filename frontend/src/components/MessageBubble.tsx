@@ -53,6 +53,12 @@ export function MessageBubble({ message, onSelectSource }: MessageBubbleProps) {
           </p>
         )}
 
+        {message.aborted && (
+          <p className="mt-1.5 text-xs italic text-slate-400 dark:text-slate-500">
+            Antwort abgebrochen
+          </p>
+        )}
+
         {message.sources && message.sources.length > 0 && (
           <SourceChips sources={message.sources} onSelect={onSelectSource} />
         )}

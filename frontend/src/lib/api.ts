@@ -20,8 +20,10 @@ export async function streamChat(question: string, handlers: StreamHandlers): Pr
       body: JSON.stringify({ question }),
       signal: handlers.signal,
     })
-  } catch {
-    handlers.onError('Verbindung zum Server fehlgeschlagen. Läuft das Backend?')
+  } catch (error) {
+    if ((error as Error).name !== 'AbortError') {
+      handlers.onError('Verbindung zum Server fehlgeschlagen. Läuft das Backend?')
+    }
     return
   }
 

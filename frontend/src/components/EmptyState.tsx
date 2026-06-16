@@ -8,9 +8,10 @@ const EXAMPLE_QUESTIONS = [
 
 interface EmptyStateProps {
   onPick: (question: string) => void
+  docCount: number
 }
 
-export function EmptyState({ onPick }: EmptyStateProps) {
+export function EmptyState({ onPick, docCount }: EmptyStateProps) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-4 py-10 text-center">
       <span className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-accent">
@@ -23,6 +24,13 @@ export function EmptyState({ onPick }: EmptyStateProps) {
         Stellen Sie Fragen zu Ihren Dokumenten. Die Antworten stammen aus einem lokalen
         KI-Modell – Ihre Daten verlassen diesen Server nicht.
       </p>
+
+      {docCount === 0 && (
+        <p className="mt-5 max-w-md rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+          Noch keine Dokumente vorhanden. Laden Sie zunächst welche über „Dokumente“ (oben
+          rechts) hoch.
+        </p>
+      )}
 
       <div className="mt-8 grid w-full max-w-md gap-2">
         <p className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
