@@ -41,6 +41,13 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- WebClient: used by Spring AI for streaming Ollama responses.
+             The app stays on the servlet (MVC) stack because spring-webmvc is present. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
         <!-- Health endpoints (used by the Docker healthcheck) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
