@@ -41,9 +41,13 @@ public class GroundedAnswerService {
               beliebigen Auszug stehen.
             - Trage die passenden Fakten und Zahlen aus allen relevanten Auszügen \
               zusammen und formuliere eine klare, vollständige Antwort.
+            - Beantworte nur die konkret gestellte Frage. Behandelt der Kontext lediglich \
+              ein verwandtes, aber anderes Thema, gilt die Information als nicht vorhanden.
             - Nur wenn KEIN Auszug eine zur Frage passende Information enthält, antworte \
               exakt mit diesem Satz: "%s"
             - Verwende niemals eigenes Vorwissen und erfinde keine Fakten, Zahlen oder Quellen.
+            - Verweise im Antworttext nicht auf Dokumentnamen oder Auszüge; die \
+              Quellenangaben werden separat angezeigt.
             - Antworte auf Deutsch, sachlich und in vollständigen Sätzen.
             """
                     .formatted(NO_ANSWER);

@@ -125,6 +125,37 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <!-- Default build runs the fast, offline unit tests and excludes the
+                 live evaluation gate (JUnit tag "eval"), which needs a running model. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>eval</excludedGroups>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- `mvn -Peval test` (or verify) runs ONLY the live evaluation gate
+             (EvalRunnerTest): it ingests eval/corpus, runs eval/dataset.jsonl through
+             the agentic pipeline, writes eval/report.json and fails on low scores.
+             Requires Ollama on localhost:11434. -->
+        <profile>
+            <id>eval</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <groups>eval</groups>
+                            <excludedGroups combine.self="override"/>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

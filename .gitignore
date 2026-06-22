@@ -35,3 +35,6 @@ qdrant_data/
 # ---- Test/verification artifacts ----
 .playwright-mcp/
 /*.png
+
+# ---- Eval harness (generated report; corpus + dataset are committed) ----
+eval/report.json

@@ -1,0 +1,13 @@
+{"id":"q01","question":"Wie viele Urlaubstage stehen mir pro Jahr zu?","expected_facts":["30"],"expected_sources":["urlaub.md"],"should_answer":true,"category":"hr"}
+{"id":"q02","question":"Bis wann muss ich meinen Resturlaub aus dem Vorjahr nehmen?","expected_facts":["31. März"],"expected_sources":["urlaub.md"],"should_answer":true,"category":"hr"}
+{"id":"q03","question":"Wie hoch ist die Kilometerpauschale für Dienstfahrten mit dem privaten PKW?","expected_facts":["0,30"],"expected_sources":["reisekosten.md"],"should_answer":true,"category":"finance"}
+{"id":"q04","question":"Wie viele Zeichen muss ein Passwort mindestens haben?","expected_facts":["zwölf"],"expected_sources":["it-sicherheit.md"],"should_answer":true,"category":"it"}
+{"id":"q05","question":"Wann liegt die Kernarbeitszeit?","expected_facts":["9:00","15:00"],"expected_sources":["arbeitszeit.md"],"should_answer":true,"category":"hr"}
+{"id":"q06","question":"Wann bekommen neue Mitarbeitende ihren Laptop?","expected_facts":["ersten Arbeitstag"],"expected_sources":["onboarding.md"],"should_answer":true,"category":"onboarding"}
+{"id":"q07","question":"Bis zu welchem Betrag werden Übernachtungskosten pro Nacht übernommen?","expected_facts":["120"],"expected_sources":["reisekosten.md"],"should_answer":true,"category":"finance"}
+{"id":"q08","question":"An welche Adresse melde ich verdächtige Phishing-E-Mails?","expected_facts":["security@firma.de"],"expected_sources":["it-sicherheit.md"],"should_answer":true,"category":"it"}
+{"id":"q09","question":"Wie viele Tage darf ich im Homeoffice arbeiten und welche Verbindung muss ich für den Fernzugriff nutzen?","expected_facts":["drei","VPN"],"expected_sources":["homeoffice.md","it-sicherheit.md"],"should_answer":true,"category":"it"}
+{"id":"q10","question":"Wie viele Stunden umfasst die Wochenarbeitszeit und wie viele Tage Homeoffice sind möglich?","expected_facts":["40","drei"],"expected_sources":["arbeitszeit.md","homeoffice.md"],"should_answer":true,"category":"hr"}
+{"id":"q11","question":"Wie hoch ist das Weihnachtsgeld im Unternehmen?","expected_facts":[],"expected_sources":[],"should_answer":false,"category":"abstain"}
+{"id":"q12","question":"Welche Regelung gibt es für die Nutzung von Dienstwagen?","expected_facts":[],"expected_sources":[],"should_answer":false,"category":"abstain"}
+{"id":"q13","question":"Wie viele bezahlte Krankheitstage gewährt das Unternehmen pro Jahr?","expected_facts":[],"expected_sources":[],"should_answer":false,"category":"abstain"}

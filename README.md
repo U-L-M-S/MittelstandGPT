@@ -129,6 +129,30 @@ Wird das **Embedding-Modell** geändert, ändert sich i. d. R. die Vektor-Dimens
 in dem Fall die Qdrant-Collection neu anlegen (anderen `QDRANT_COLLECTION`-Namen
 verwenden oder das Qdrant-Volume zurücksetzen) und die Dokumente erneut hochladen.
 
+### Qualität & Evaluation
+
+Die Antwortqualität wird mit **echten Zahlen** gemessen und kann den Build
+absichern – nichts wird geschätzt oder fest verdrahtet. Ein Golden-Datensatz und
+ein kleiner Beispiel-Korpus liegen im Verzeichnis `eval/` und sind eigenständig.
+
+```bash
+cd backend
+mvn -Peval test      # benötigt das lokale Ollama; schreibt eval/report.json
+```
+
+Gemessen werden **Trefferquote@k**, **MRR**, **Kontext-Precision/Recall**
+(Retrieval) sowie **Faithfulness** (Spring AI `FactCheckingEvaluator`) und
+**Antwort-Relevanz** (`RelevancyEvaluator`) für die Generierung, dazu die
+**Abstaining-Korrektheit** für Fragen ohne Beleg. Mit dem lokalen Modell
+`qwen2.5:3b-instruct` gemessen: Faithfulness ≈ 1,0, Trefferquote@k = 1,0, MRR =
+1,0, Kontext-Recall ≈ 0,95. (Die Antwort-Relevanz fällt mit dem schwachen
+3B-Bewertungsmodell niedriger und schwankt – daher kein Gate-Kriterium.)
+
+Der Build bricht ab, wenn `MI_EVAL_MIN_FAITHFULNESS` (Standard 0,90) oder
+`MI_EVAL_MIN_HITRATE` (Standard 0,80) unterschritten werden. Dass das Gate echt
+ist, lässt sich beweisen: `MI_RAG_SIMILARITY_THRESHOLD=1.0 mvn -Peval test`
+liefert keine Treffer → Trefferquote 0 → Build schlägt fehl.
+
 ### Datenschutz / DSGVO / On-Premise
 
 - **Keine Cloud, keine externen Aufrufe.** LLM, Embeddings und Vektor-DB laufen
@@ -228,6 +252,26 @@ you change the **embedding** model, the vector dimension usually changes — use
 | POST   | `/api/chat/stream`    | Same, streamed as Server-Sent Events         |
 | GET    | `/api/health`         | Liveness                                     |
 | GET    | `/api/health/ai`      | Connectivity to Ollama + Qdrant              |
+
+### Evaluation
+
+Answer quality is measured with **real numbers** and can gate the build — never
+estimated or hardcoded. A golden dataset and a small fixture corpus live in
+`eval/` and run offline:
+
+```bash
+cd backend && mvn -Peval test   # needs local Ollama; writes eval/report.json
+```
+
+Retrieval metrics (hit-rate@k, MRR, context precision/recall) plus generation
+faithfulness (Spring AI `FactCheckingEvaluator`), answer relevance
+(`RelevancyEvaluator`) and abstention correctness. Measured with the local
+`qwen2.5:3b-instruct`: faithfulness ≈ 1.0, hit-rate@k = 1.0, MRR = 1.0, context
+recall ≈ 0.95 (answer relevance is lower and noisy with the small judge model, so
+it is not a gate metric). The build fails below `MI_EVAL_MIN_FAITHFULNESS`
+(default 0.90) or `MI_EVAL_MIN_HITRATE` (default 0.80). The gate is real:
+`MI_RAG_SIMILARITY_THRESHOLD=1.0 mvn -Peval test` breaks retrieval → hit-rate 0 →
+build fails.
 
 ### Privacy / GDPR
 

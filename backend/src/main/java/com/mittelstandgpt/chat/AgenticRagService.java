@@ -79,10 +79,12 @@ public class AgenticRagService {
     }
 
     /**
-     * The bounded corrective-retrieval loop. Package-visible so it can be unit
-     * tested in isolation with a mocked retriever and grader.
+     * The bounded corrective-retrieval loop, exposed for evaluation and
+     * observability: returns the chunks selected for grounding plus loop telemetry
+     * (hop count, queries issued). Also unit tested in isolation with a mocked
+     * retriever and grader.
      */
-    RetrievalOutcome retrieveCorrectively(String question) {
+    public RetrievalOutcome retrieveCorrectively(String question) {
         int maxHops = Math.max(1, props.getMaxHops());
         int topK = props.getTopK();
         // Preserve first-seen order while de-duplicating chunks carried across hops.
