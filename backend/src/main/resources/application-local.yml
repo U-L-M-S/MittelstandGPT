@@ -18,6 +18,8 @@ spring:
       chat:
         options:
           model: ${OLLAMA_CHAT_MODEL:qwen2.5:3b-instruct}
+          # Zero temperature for faithful, reproducible RAG answers and grading.
+          temperature: ${OLLAMA_TEMPERATURE:0.0}
       embedding:
         options:
           model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}

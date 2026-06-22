@@ -27,10 +27,10 @@ import reactor.core.publisher.Flux;
 @RequestMapping("/api/chat")
 public class ChatController {
 
-    private final RagService rag;
+    private final AgenticRagService rag;
     private final ObjectMapper objectMapper;
 
-    public ChatController(RagService rag, ObjectMapper objectMapper) {
+    public ChatController(AgenticRagService rag, ObjectMapper objectMapper) {
         this.rag = rag;
         this.objectMapper = objectMapper;
     }
@@ -48,14 +48,14 @@ public class ChatController {
         if (request == null || !StringUtils.hasText(request.question())) {
             return Flux.just(sse("error", "Bitte eine Frage eingeben."));
         }
-        RagService.StreamResult result = rag.stream(request.question().strip());
+        AgenticRagService.StreamResult result = rag.stream(request.question().strip());
         StringBuilder answer = new StringBuilder();
         Flux<ServerSentEvent<String>> tokens =
                 result.answerTokens().doOnNext(answer::append).map(t -> sse("token", t));
         // Resolved after all tokens have streamed: omit sources for a "not found" answer.
         Flux<ServerSentEvent<String>> tail = Flux.defer(() -> {
             List<Source> sources =
-                    RagService.isNoAnswer(answer.toString()) ? List.of() : result.sources();
+                    GroundedAnswerService.isNoAnswer(answer.toString()) ? List.of() : result.sources();
             return Flux.just(sse("sources", writeSources(sources)), sse("done", "end"));
         });
         return Flux.concat(tokens, tail);

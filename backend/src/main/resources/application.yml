@@ -16,6 +16,16 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
 
+# Agentic retrieval loop (Workstream A). Explicit env placeholders keep the exact
+# variable names from the brief: MI_RAG_MAX_HOPS / MI_RAG_TOPK / MI_RAG_GRADING_ENABLED.
+mi:
+  rag:
+    max-hops: ${MI_RAG_MAX_HOPS:3}
+    top-k: ${MI_RAG_TOPK:4}
+    grading-enabled: ${MI_RAG_GRADING_ENABLED:true}
+    # Optional deterministic precision lever (0.0 = accept all top-k).
+    similarity-threshold: ${MI_RAG_SIMILARITY_THRESHOLD:0.0}
+
 # Actuator: health/info for the Docker healthcheck. Metrics/prometheus and trace
 # export are added in the observability milestone.
 management:
