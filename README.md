@@ -22,6 +22,14 @@ die passendsten Abschnitte gesucht und einem lokalen Sprachmodell als Kontext
 die verwendeten Quellen (Datei + Seite) an. Steht die Antwort nicht in den Dokumenten,
 sagt es das ehrlich.
 
+Die Suche ist **agentisch und selbstkorrigierend** (Corrective-RAG): Statt einmalig
+die Top-Treffer zu übernehmen, durchläuft das System eine **begrenzte Schleife** aus
+_Suchen → Relevanz/Vollständigkeit prüfen → Anfrage umformulieren → erneut suchen_ und
+antwortet erst, wenn der gesammelte Kontext ausreicht. So lassen sich auch Fragen
+beantworten, deren Antwort über **mehrere Dokumente** verteilt ist – jeweils mit den
+tatsächlich verwendeten Quellen. Die Anzahl der Schleifendurchläufe ist nach oben
+begrenzt (`MI_RAG_MAX_HOPS`, Standard 3).
+
 ### Architektur
 
 ```
@@ -34,7 +42,7 @@ sagt es das ehrlich.
                           ┌─────────────────────────────┐
                           │   BACKEND (Spring Boot)      │
    Upload  ──────────────►│  Tika → Chunking → Embedding │
-   (PDF/DOCX/TXT)         │  Retrieval → Prompt → LLM    │
+   (PDF/DOCX/TXT)         │  Agentische Schleife ↻ → LLM │
                           └─────────┬──────────┬─────────┘
                        Embeddings/  │          │  Vektor-Suche
                        Generierung  ▼          ▼
@@ -49,7 +57,8 @@ sagt es das ehrlich.
 | Schicht        | Technologie                                                  |
 | -------------- | ------------------------------------------------------------ |
 | Frontend       | React + TypeScript + Vite + Tailwind CSS                     |
-| Backend / API  | Java 21 + Spring Boot 3.4 + Spring AI                        |
+| Backend / API  | Java 21 + Spring Boot 3.4 + Spring AI 1.0                    |
+| Agentik        | Spring AI Tools + Advisors – Corrective-RAG-Schleife        |
 | LLM (lokal)    | Ollama – `qwen2.5:3b-instruct`                              |
 | Embeddings     | Ollama – `nomic-embed-text`                                 |
 | Vektor-DB      | Qdrant                                                       |
@@ -97,11 +106,14 @@ Zum Überschreiben `.env.example` nach `.env` kopieren:
 cp .env.example .env
 ```
 
-| Variable                 | Vorgabe              | Bedeutung                         |
-| ------------------------ | -------------------- | --------------------------------- |
-| `OLLAMA_CHAT_MODEL`      | `qwen2.5:3b-instruct`| Sprachmodell für die Antworten    |
-| `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text`   | Modell für die Vektor-Einbettung  |
-| `QDRANT_COLLECTION`      | `mittelstandgpt`     | Name der Qdrant-Collection        |
+| Variable                 | Vorgabe              | Bedeutung                          |
+| ------------------------ | -------------------- | ---------------------------------- |
+| `OLLAMA_CHAT_MODEL`      | `qwen2.5:3b-instruct`| Sprachmodell für die Antworten     |
+| `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text`   | Modell für die Vektor-Einbettung   |
+| `QDRANT_COLLECTION`      | `mittelstandgpt`     | Name der Qdrant-Collection         |
+| `MI_RAG_MAX_HOPS`        | `3`                  | Max. Such-/Korrektur-Durchläufe    |
+| `MI_RAG_TOPK`            | `4`                  | Treffer pro Vektor-Suche           |
+| `MI_RAG_GRADING_ENABLED` | `true`               | Relevanz-/Vollständigkeitsprüfung  |
 
 ### Modell tauschen
 
@@ -137,7 +149,7 @@ verwenden oder das Qdrant-Volume zurücksetzen) und die Dokumente erneut hochlad
 ├── .env.example            # konfigurierbare Modelle / Collection
 ├── backend/                # Java 21 + Spring Boot 3.4 + Spring AI
 │   └── src/main/java/com/mittelstandgpt/
-│       ├── chat/           # RAG-Query + Streaming (/api/chat)
+│       ├── chat/           # Agentische RAG-Schleife + Streaming (/api/chat)
 │       ├── document/       # Ingestion + Upload (/api/documents)
 │       └── controller/     # Health-Endpoints
 └── frontend/               # React + TS + Vite + Tailwind
@@ -166,6 +178,13 @@ most relevant chunks are retrieved and passed to a local language model as conte
 The model answers **only from those documents** and cites its sources (file + page);
 if the answer isn't in the documents, it says so.
 
+Retrieval is **agentic and self-correcting** (Corrective-RAG): instead of a single
+top-k lookup, the system runs a **bounded loop** of _search → grade relevance and
+sufficiency → reformulate → search again_, answering only once the gathered context
+is enough — so questions whose answer spans **multiple documents** are handled too,
+each with the sources actually used. The hop count is bounded (`MI_RAG_MAX_HOPS`,
+default 3).
+
 Everything runs locally in Docker — **no cloud, no external API calls** — so it is
 suitable for GDPR-sensitive, on-premise use.
 
@@ -191,6 +210,9 @@ override:
 | `OLLAMA_CHAT_MODEL`      | `qwen2.5:3b-instruct` | Chat / generation model      |
 | `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text`    | Embedding model              |
 | `QDRANT_COLLECTION`      | `mittelstandgpt`      | Qdrant collection name       |
+| `MI_RAG_MAX_HOPS`        | `3`                   | Max retrieve/correct hops    |
+| `MI_RAG_TOPK`            | `4`                   | Chunks fetched per search    |
+| `MI_RAG_GRADING_ENABLED` | `true`                | Relevance/sufficiency grading|
 
 **Swapping the model:** set `OLLAMA_CHAT_MODEL` and restart `docker compose up`. If
 you change the **embedding** model, the vector dimension usually changes — use a new
@@ -212,4 +234,3 @@ you change the **embedding** model, the vector dimension usually changes — use
 No cloud and no external calls at runtime: the LLM, embeddings and vector DB all run
 locally. The web font is self-hosted (no Google Fonts CDN), and Qdrant telemetry is
 disabled. The only outbound traffic is the one-time model download on first start.
-```
