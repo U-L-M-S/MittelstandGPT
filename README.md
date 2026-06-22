@@ -200,6 +200,16 @@ http://localhost:3000 (Demo-Login `admin@mittelstandgpt.local` /
 - Der Langfuse-Stack ist ressourcenintensiv; die Kern-App hängt nicht von ihm ab
   und läuft auch ohne ihn (der Trace-Export schlägt dann still fehl).
 
+### MCP-Server (Wissensbasis für Claude Desktop/Code)
+
+Die Retrieval-Werkzeuge der Wissensbasis werden zusätzlich über das **Model
+Context Protocol (MCP)** als SSE/HTTP-Server unter
+`http://localhost:8080/mcp/sse` bereitgestellt. Damit lässt sich dieselbe
+Wissensbasis direkt aus MCP-Clients wie **Claude Desktop** oder **Claude Code**
+nutzen (`searchKnowledgeBase`, `listDocuments`, `searchWithinDocument`). Es kommen
+exakt dieselben `@Tool`-Methoden wie im Agenten zum Einsatz, sodass MCP nie vom
+Produktionsverhalten abweicht. Abschaltbar mit `MI_MCP_ENABLED=false`.
+
 ### Datenschutz / DSGVO / On-Premise
 
 - **Keine Cloud, keine externen Aufrufe.** LLM, Embeddings und Vektor-DB laufen
@@ -350,6 +360,15 @@ metrics are at http://localhost:8080/actuator/prometheus
 (`mittelstandgpt_tokens`, `mittelstandgpt_cost_total`); model prices via
 `MI_COST_INPUT_PER_1K` / `MI_COST_OUTPUT_PER_1K`. The core app does not depend on
 Langfuse and runs without it (trace export then fails silently).
+
+### MCP server (knowledge base for Claude Desktop/Code)
+
+The knowledge-base retrieval tools are also served over the **Model Context
+Protocol** as an SSE/HTTP server at `http://localhost:8080/mcp/sse`, so the same
+knowledge base is usable directly from MCP clients such as **Claude Desktop** /
+**Claude Code** (`searchKnowledgeBase`, `listDocuments`, `searchWithinDocument`).
+It reuses the exact `@Tool` methods the agent uses, so MCP never diverges from
+production behaviour. Disable with `MI_MCP_ENABLED=false`.
 
 ### Privacy / GDPR
 

@@ -105,6 +105,14 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-tika-document-reader</artifactId>
         </dependency>
+
+        <!-- MCP server (stretch): re-expose the knowledge-base retrieval tools over the
+             Model Context Protocol (SSE/HTTP on the servlet stack) so the same KB is
+             usable from MCP clients (Claude Desktop/Code). Reuses KnowledgeBaseTools. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-pdf-document-reader</artifactId>

@@ -121,6 +121,15 @@ one is chosen by `spring.ai.model.chat`/`embedding` plus per-profile
 - Langfuse can't be pulled/run in every sandbox (image rate limits); the compose
   wiring is correct (validated with `docker compose config`) and wire-verified.
 
+## MCP server (mcp package)
+
+- `McpConfig` registers `KnowledgeBaseTools` as a `ToolCallbackProvider`; the Spring
+  AI MCP server (`spring-ai-starter-mcp-server-webmvc`) advertises them over SSE/HTTP
+  at `/mcp/sse` so the same KB is usable from Claude Desktop/Code. Same `@Tool`
+  methods as the agent — MCP never diverges. Gated by `spring.ai.mcp.server.enabled`
+  (`MI_MCP_ENABLED`, default on). `McpServerEndpointTest` boots the server and checks
+  the SSE handshake; `McpToolExposureTest` checks the tools are advertised.
+
 ## Environment notes
 
 - Docker daemon may be remote/unavailable; use named volumes, not host bind

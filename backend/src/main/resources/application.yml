@@ -23,6 +23,18 @@ spring:
         # always captured (they carry no document content).
         log-prompt: ${MI_OBSERVE_CONTENT:false}
         log-completion: ${MI_OBSERVE_CONTENT:false}
+    # MCP server (stretch): re-expose the knowledge-base tools over SSE/HTTP so MCP
+    # clients (Claude Desktop/Code) can use the same KB. Local, no external calls.
+    mcp:
+      server:
+        enabled: ${MI_MCP_ENABLED:true}
+        name: mittelstandgpt-knowledge-base
+        version: 0.0.1
+        instructions: >-
+          Werkzeuge zur Suche in den hochgeladenen Unternehmensdokumenten
+          (Wissensbasis von MittelstandGPT).
+        sse-endpoint: /mcp/sse
+        sse-message-endpoint: /mcp/message
 
 # Agentic retrieval loop (Workstream A). Explicit env placeholders keep the exact
 # variable names from the brief: MI_RAG_MAX_HOPS / MI_RAG_TOPK / MI_RAG_GRADING_ENABLED.
