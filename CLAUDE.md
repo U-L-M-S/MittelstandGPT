@@ -81,7 +81,11 @@ Backend is selected purely by Spring profile; business logic depends only on the
 - `local` (default): Ollama (`qwen2.5:3b-instruct`) + `nomic-embed-text` +
   Qdrant. Fully offline. Azure autoconfigurations are excluded here.
 - `azure`: Azure OpenAI + Azure AI Search (`application-azure.yml`, env-driven).
-  Requires Azure credentials → not exercised offline; wire-verified only.
+  Wiring is tested offline with dummy creds (Azure SDK clients are lazy) in
+  `AzureProfileWiringTest`; a live run needs real Azure credentials (CI-skipped).
+  `DocumentIngestionService`/`HealthController` default their Qdrant/Ollama
+  properties so they construct under any profile; the Qdrant-specific registry
+  rebuild is skipped when no Qdrant REST URL is set.
 
 Config is split into `application.yml` (shared), `application-local.yml`,
 `application-azure.yml`. Both provider starters are on the classpath; the active

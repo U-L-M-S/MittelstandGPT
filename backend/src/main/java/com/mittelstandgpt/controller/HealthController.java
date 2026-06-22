@@ -28,8 +28,8 @@ public class HealthController {
     private final RestClient qdrantClient;
 
     public HealthController(
-            @Value("${spring.ai.ollama.base-url}") String ollamaBaseUrl,
-            @Value("${app.qdrant.rest-url}") String qdrantRestUrl) {
+            @Value("${spring.ai.ollama.base-url:}") String ollamaBaseUrl,
+            @Value("${app.qdrant.rest-url:}") String qdrantRestUrl) {
         this.ollamaClient = RestClient.builder().baseUrl(ollamaBaseUrl).requestFactory(timeouts()).build();
         this.qdrantClient = RestClient.builder().baseUrl(qdrantRestUrl).requestFactory(timeouts()).build();
     }

@@ -129,6 +129,34 @@ Wird das **Embedding-Modell** geändert, ändert sich i. d. R. die Vektor-Dimens
 in dem Fall die Qdrant-Collection neu anlegen (anderen `QDRANT_COLLECTION`-Namen
 verwenden oder das Qdrant-Volume zurücksetzen) und die Dokumente erneut hochladen.
 
+### Backend wechseln: lokal oder Azure (Profile)
+
+Das Backend ist **provider-portabel**: derselbe Agent-, Eval- und
+Observability-Code läuft entweder vollständig lokal oder auf Azure – ausgewählt
+allein über ein Spring-Profil, **ohne Code-Änderung** (die Geschäftslogik hängt nur
+von den Spring-AI-Schnittstellen `VectorStore` und `ChatClient` ab).
+
+- `local` (Standard): Ollama + Qdrant, vollständig offline – der DSGVO-USP.
+- `azure`: Azure OpenAI (Chat + Embeddings) + Azure AI Search.
+
+```bash
+SPRING_PROFILES_ACTIVE=azure \
+  AZURE_OPENAI_API_KEY=... AZURE_OPENAI_ENDPOINT=https://<res>.openai.azure.com \
+  AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o-mini \
+  AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small \
+  AZURE_AISEARCH_ENDPOINT=https://<svc>.search.windows.net AZURE_AISEARCH_API_KEY=... \
+  docker compose up
+```
+
+- **Daten/DSGVO-Abwägung:** Das `azure`-Profil sendet Inhalte an Azure OpenAI –
+  dafür bewusst eine **EU-Region** wählen und Azures Datenverarbeitung prüfen. Das
+  `local`-Profil hält alles on-prem. Eine bewusste, dokumentierte Architektur-Wahl.
+- **Re-Embedding:** nomic-embed-text (768 Dim.) und Azure `text-embedding-3-*` haben
+  unterschiedliche Vektor-Dimensionen; jedes Profil nutzt daher seinen eigenen
+  Index. Ein Profilwechsel erfordert ein erneutes Einbetten der Dokumente.
+- Die Verdrahtung des `azure`-Profils ist getestet (offline, mit Dummy-Zugangsdaten);
+  ein echter Lauf erfordert Azure-Zugangsdaten und ist daher CI-übersprungen.
+
 ### Qualität & Evaluation
 
 Die Antwortqualität wird mit **echten Zahlen** gemessen und kann den Build
@@ -260,6 +288,23 @@ override:
 **Swapping the model:** set `OLLAMA_CHAT_MODEL` and restart `docker compose up`. If
 you change the **embedding** model, the vector dimension usually changes — use a new
 `QDRANT_COLLECTION` (or reset the Qdrant volume) and re-upload your documents.
+
+### Backend: local or Azure (profiles)
+
+The backend is **provider-portable**: the same agent, eval and observability code
+runs either fully local or on Azure, selected purely by a Spring profile (business
+logic depends only on the Spring AI `VectorStore` + `ChatClient` interfaces — no
+provider `if/else`).
+
+- `local` (default): Ollama + Qdrant, fully offline.
+- `azure`: Azure OpenAI + Azure AI Search — set `SPRING_PROFILES_ACTIVE=azure` plus
+  the `AZURE_OPENAI_*` / `AZURE_AISEARCH_*` env vars.
+
+**Data-residency trade-off:** the `azure` profile sends content to Azure OpenAI
+(choose an EU region); `local` keeps everything on-premises. The two embedding models
+differ in vector dimension, so each profile uses its own index and switching profiles
+requires re-embedding. The azure wiring is tested offline with dummy credentials; a
+live run needs Azure credentials and is CI-skipped.
 
 ### REST API
 

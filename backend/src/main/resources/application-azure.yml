@@ -32,7 +32,6 @@ spring:
         url: ${AZURE_AISEARCH_ENDPOINT}
         api-key: ${AZURE_AISEARCH_API_KEY}
         index-name: ${AZURE_AISEARCH_INDEX:mittelstandgpt}
-        initialize-schema: true
   # Qdrant is selected by @ConditionalOnClass (not by spring.ai.vectorstore.type),
   # so it would otherwise also activate here and create a second VectorStore bean —
   # exclude it explicitly. Ollama chat/embedding are already off via the model
@@ -41,8 +40,9 @@ spring:
     exclude:
       - org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration
 
-# The Qdrant REST URL is unused under this profile but kept resolvable so beans
-# wired for the local store still construct.
+# No Qdrant under this profile: leave the REST URL blank so the Qdrant-specific
+# startup registry rebuild is skipped (DocumentIngestionService stays provider-agnostic
+# for ingestion itself).
 app:
   qdrant:
-    rest-url: ${QDRANT_REST_URL:http://localhost:6333}
+    rest-url: ${QDRANT_REST_URL:}

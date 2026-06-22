@@ -59,10 +59,17 @@ public class DocumentIngestionService {
 
     public DocumentIngestionService(
             VectorStore vectorStore,
-            @Value("${app.qdrant.rest-url}") String qdrantRestUrl,
-            @Value("${spring.ai.vectorstore.qdrant.collection-name}") String collection) {
+            @Value("${app.qdrant.rest-url:}") String qdrantRestUrl,
+            @Value("${spring.ai.vectorstore.qdrant.collection-name:mittelstandgpt}") String collection) {
         this.vectorStore = vectorStore;
-        this.qdrantRest = RestClient.builder().baseUrl(qdrantRestUrl).build();
+        // The startup registry rebuild scrolls Qdrant's REST API directly, so it only
+        // applies to the local (Qdrant) profile. Under the azure profile the URL is
+        // blank and the rebuild is skipped; ingestion itself stays provider-agnostic
+        // (vectorStore.add works on any VectorStore).
+        this.qdrantRest =
+                StringUtils.hasText(qdrantRestUrl)
+                        ? RestClient.builder().baseUrl(qdrantRestUrl).build()
+                        : null;
         this.collection = collection;
     }
 
@@ -166,6 +173,10 @@ public class DocumentIngestionService {
      */
     @PostConstruct
     void rebuildRegistryFromQdrant() {
+        if (qdrantRest == null) {
+            // Not on the Qdrant profile (e.g. azure): nothing to rebuild from here.
+            return;
+        }
         try {
             Map<String, Accumulator> bySource = new HashMap<>();
             Object offset = null;
