@@ -3,6 +3,7 @@ package com.mittelstandgpt.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mittelstandgpt.document.DocumentIngestionService;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -93,6 +94,16 @@ class AgenticRagIT {
     }
 
     @Autowired private AgenticRagService rag;
+    @Autowired private MeterRegistry meterRegistry;
+
+    @Test
+    void recordsTokenMetricsDuringAnswer() {
+        rag.ask("Wie viele Urlaubstage stehen mir zu und wie beantrage ich meinen Urlaub?");
+
+        double inputTokens =
+                meterRegistry.get("mittelstandgpt.tokens").tag("type", "input").counter().count();
+        assertThat(inputTokens).as("input tokens recorded for the chat").isGreaterThan(0.0);
+    }
 
     @Test
     void combinesTwoDocumentsAndCitesBoth() {

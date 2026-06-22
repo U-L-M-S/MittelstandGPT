@@ -6,6 +6,37 @@
 # variables (see .env.example) so the LLM/embedding model can be swapped
 # without touching the code.
 
+# Shared environment for the self-hosted Langfuse services (Workstream C). Based on
+# the official Langfuse v3 self-host compose, adapted to this private network and
+# named volumes. All secrets/keys are dev defaults — change them for any real use.
+x-langfuse-shared-env: &langfuse-shared-env
+  DATABASE_URL: postgresql://postgres:${LF_POSTGRES_PASSWORD:-postgres}@langfuse-postgres:5432/postgres
+  SALT: ${LF_SALT:-mittelstandgpt-langfuse-salt}
+  ENCRYPTION_KEY: ${LF_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+  CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+  CLICKHOUSE_USER: ${LF_CLICKHOUSE_USER:-clickhouse}
+  CLICKHOUSE_PASSWORD: ${LF_CLICKHOUSE_PASSWORD:-clickhouse}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  REDIS_HOST: langfuse-redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${LF_REDIS_PASSWORD:-myredissecret}
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LF_MINIO_USER:-minio}
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LF_MINIO_PASSWORD:-miniosecret}
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LF_MINIO_USER:-minio}
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LF_MINIO_PASSWORD:-miniosecret}
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+
 services:
   # ---- Local LLM runtime (text generation + embeddings) ----
   ollama:
@@ -97,6 +128,16 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6334
       QDRANT_COLLECTION: ${QDRANT_COLLECTION:-mittelstandgpt}
+      # Observability: export OTLP traces to self-hosted Langfuse. The `dev` profile
+      # enables tracing with full content (acceptable on-prem); use `local,prod` to
+      # suppress prompt/response content. Resilient: if Langfuse is down the export
+      # fails quietly and the app keeps serving.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local,dev}
+      LANGFUSE_OTLP_ENDPOINT: http://langfuse-web:3000/api/public/otel/v1/traces
+      # Basic base64("<public-key>:<secret-key>") of the demo keys below. If you
+      # change LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY, recompute this:
+      #   printf '%s:%s' "$PUBLIC" "$SECRET" | base64 -w0
+      LANGFUSE_OTLP_AUTH: ${LANGFUSE_OTLP_AUTH:-Basic cGstbGYtbWl0dGVsc3RhbmRncHQwMDAwMDAwMDAwMDAwMDAxOnNrLWxmLW1pdHRlbHN0YW5kZ3B0MDAwMDAwMDAwMDAwMDAwMQ==}
     depends_on:
       ollama:
         condition: service_healthy
@@ -143,9 +184,155 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  # ---- Self-hosted Langfuse: observability backend for OTLP traces ----
+  # Telemetry never leaves the server. langfuse-web auto-provisions a demo project
+  # via LANGFUSE_INIT_*, so the backend exports traces with the demo keys out of the
+  # box. This stack (Postgres + ClickHouse + Redis + MinIO + web + worker) is heavy;
+  # the core app does not depend on it and runs fine if it is omitted.
+  langfuse-postgres:
+    image: postgres:17
+    container_name: mittelstandgpt-langfuse-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LF_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    networks:
+      - mittelstand-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  langfuse-redis:
+    image: redis:7
+    container_name: mittelstandgpt-langfuse-redis
+    command: --requirepass ${LF_REDIS_PASSWORD:-myredissecret}
+    volumes:
+      - langfuse_redis_data:/data
+    networks:
+      - mittelstand-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server
+    container_name: mittelstandgpt-langfuse-clickhouse
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: ${LF_CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${LF_CLICKHOUSE_PASSWORD:-clickhouse}
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - mittelstand-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  langfuse-minio:
+    image: minio/minio
+    container_name: mittelstandgpt-langfuse-minio
+    entrypoint: sh
+    # Create the bucket on first start, then serve.
+    command: -c 'mkdir -p /data/langfuse && minio server /data --address ":9000" --console-address ":9001"'
+    environment:
+      MINIO_ROOT_USER: ${LF_MINIO_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${LF_MINIO_PASSWORD:-miniosecret}
+    volumes:
+      - langfuse_minio_data:/data
+    networks:
+      - mittelstand-net
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 0"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    container_name: mittelstandgpt-langfuse-worker
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+    environment:
+      <<: *langfuse-shared-env
+    networks:
+      - mittelstand-net
+    restart: unless-stopped
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    container_name: mittelstandgpt-langfuse-web
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000" # Langfuse dashboard
+    environment:
+      <<: *langfuse-shared-env
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${LF_NEXTAUTH_SECRET:-mittelstandgpt-nextauth-secret}
+      # Auto-provision a demo org/project + keys so OTLP export works immediately.
+      LANGFUSE_INIT_ORG_ID: mittelstandgpt
+      LANGFUSE_INIT_ORG_NAME: MittelstandGPT
+      LANGFUSE_INIT_PROJECT_ID: mittelstandgpt
+      LANGFUSE_INIT_PROJECT_NAME: MittelstandGPT
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-mittelstandgpt0000000000000001}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-mittelstandgpt0000000000000001}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_USER_EMAIL:-admin@mittelstandgpt.local}
+      LANGFUSE_INIT_USER_NAME: Admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_USER_PASSWORD:-changeme-langfuse}
+    networks:
+      - mittelstand-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/public/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+
 volumes:
   ollama_data:
   qdrant_data:
+  langfuse_postgres_data:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio_data:
+  langfuse_redis_data:
 
 networks:
   mittelstand-net:

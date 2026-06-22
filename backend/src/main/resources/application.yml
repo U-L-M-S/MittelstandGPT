@@ -15,6 +15,14 @@ spring:
       # Generous limits for document uploads.
       max-file-size: 50MB
       max-request-size: 50MB
+  ai:
+    chat:
+      observations:
+        # Prompt/response CONTENT in telemetry is OFF by default (GDPR). The `dev`
+        # profile turns it on; `prod` keeps it off. Token counts and latency are
+        # always captured (they carry no document content).
+        log-prompt: ${MI_OBSERVE_CONTENT:false}
+        log-completion: ${MI_OBSERVE_CONTENT:false}
 
 # Agentic retrieval loop (Workstream A). Explicit env placeholders keep the exact
 # variable names from the brief: MI_RAG_MAX_HOPS / MI_RAG_TOPK / MI_RAG_GRADING_ENABLED.
@@ -25,21 +33,33 @@ mi:
     grading-enabled: ${MI_RAG_GRADING_ENABLED:true}
     # Optional deterministic precision lever (0.0 = accept all top-k).
     similarity-threshold: ${MI_RAG_SIMILARITY_THRESHOLD:0.0}
+  # Per-1000-token prices used to derive an estimated request cost metric. Default
+  # 0.0 (the local model is free); set real prices per model/profile (e.g. azure).
+  cost:
+    input-per-1k: ${MI_COST_INPUT_PER_1K:0.0}
+    output-per-1k: ${MI_COST_OUTPUT_PER_1K:0.0}
+    currency: ${MI_COST_CURRENCY:EUR}
 
-# Actuator: health/info for the Docker healthcheck. Metrics/prometheus and trace
-# export are added in the observability milestone.
+# Actuator + observability (Workstream C).
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # Prometheus scrape endpoint exposes token/cost metrics; health for Docker.
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
-  # The Micrometer tracing bridge + OTLP exporter are on the classpath, but tracing
-  # and span export stay OFF here so application behaviour is unchanged. The
-  # observability milestone enables this and points it at self-hosted Langfuse.
+  # Span export is opt-in via the `dev`/`prod` profile (which point OTLP at
+  # self-hosted Langfuse). The default profile makes no export attempts, so it runs
+  # fully offline; Micrometer metrics (incl. tokens/cost) are always available.
   tracing:
-    enabled: false
+    enabled: ${MI_TRACING_ENABLED:false}
+    sampling:
+      probability: ${MI_TRACING_SAMPLING:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:}
+      transport: http

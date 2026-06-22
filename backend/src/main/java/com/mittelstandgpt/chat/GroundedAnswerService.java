@@ -1,12 +1,16 @@
 package com.mittelstandgpt.chat;
 
 import com.mittelstandgpt.document.DocumentIngestionService;
+import com.mittelstandgpt.observability.TokenCostMetrics;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -53,19 +57,54 @@ public class GroundedAnswerService {
                     .formatted(NO_ANSWER);
 
     private final ChatClient chatClient;
+    private final TokenCostMetrics metrics;
 
-    public GroundedAnswerService(ChatClient.Builder chatClientBuilder) {
+    public GroundedAnswerService(ChatClient.Builder chatClientBuilder, TokenCostMetrics metrics) {
         this.chatClient = chatClientBuilder.defaultSystem(SYSTEM_PROMPT).build();
+        this.metrics = metrics;
     }
 
-    /** Grounded answer, synchronously. */
+    /** Grounded answer, synchronously. Records token usage / cost metrics. */
     public String answer(String question, List<Document> chunks) {
-        return chatClient.prompt().user(userMessage(question, chunks)).call().content();
+        ChatResponse response =
+                chatClient.prompt().user(userMessage(question, chunks)).call().chatResponse();
+        metrics.record(usageOf(response));
+        return textOf(response);
     }
 
-    /** Grounded answer streamed token by token. */
+    /** Grounded answer streamed token by token. Records usage on completion. */
     public Flux<String> streamAnswer(String question, List<Document> chunks) {
-        return chatClient.prompt().user(userMessage(question, chunks)).stream().content();
+        AtomicReference<Usage> lastUsage = new AtomicReference<>();
+        return chatClient
+                .prompt()
+                .user(userMessage(question, chunks))
+                .stream()
+                .chatResponse()
+                .doOnNext(
+                        response -> {
+                            Usage usage = usageOf(response);
+                            if (usage != null) {
+                                lastUsage.set(usage);
+                            }
+                        })
+                .map(GroundedAnswerService::textOf)
+                .doOnComplete(() -> metrics.record(lastUsage.get()));
+    }
+
+    private static String textOf(ChatResponse response) {
+        if (response == null
+                || response.getResult() == null
+                || response.getResult().getOutput() == null) {
+            return "";
+        }
+        String text = response.getResult().getOutput().getText();
+        return text != null ? text : "";
+    }
+
+    private static Usage usageOf(ChatResponse response) {
+        return response != null && response.getMetadata() != null
+                ? response.getMetadata().getUsage()
+                : null;
     }
 
     /** Whether an answer is (or contains) the canned "not in the documents" response. */

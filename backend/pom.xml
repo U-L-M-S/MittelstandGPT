@@ -93,6 +93,12 @@
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-exporter-otlp</artifactId>
         </dependency>
+        <!-- Prometheus scrape endpoint at /actuator/prometheus for token/cost metrics. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <scope>runtime</scope>
+        </dependency>
 
         <!-- Document parsing: Tika (DOCX/TXT/…) and page-aware PDF reader -->
         <dependency>

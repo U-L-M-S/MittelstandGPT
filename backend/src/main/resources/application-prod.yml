@@ -1,0 +1,21 @@
+# Profile: prod — telemetry WITHOUT sensitive content (GDPR). Combine with a backend
+# profile, e.g. SPRING_PROFILES_ACTIVE=azure,prod. Traces (spans, token counts,
+# latency, cost) are exported to self-hosted Langfuse, but prompt/response CONTENT
+# is never exported.
+management:
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${MI_TRACING_SAMPLING:0.1}
+  otlp:
+    tracing:
+      endpoint: ${LANGFUSE_OTLP_ENDPOINT:}
+      transport: http
+      headers:
+        Authorization: ${LANGFUSE_OTLP_AUTH:}
+spring:
+  ai:
+    chat:
+      observations:
+        log-prompt: false
+        log-completion: false

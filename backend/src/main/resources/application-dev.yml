@@ -1,0 +1,21 @@
+# Profile: dev — full telemetry for debugging. Combine with a backend profile,
+# e.g. SPRING_PROFILES_ACTIVE=local,dev. Traces are exported to self-hosted
+# Langfuse and INCLUDE prompt/response content (only acceptable outside production).
+management:
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${LANGFUSE_OTLP_ENDPOINT:http://localhost:3000/api/public/otel/v1/traces}
+      transport: http
+      headers:
+        # "Basic <base64(publicKey:secretKey)>" of the Langfuse project keys.
+        Authorization: ${LANGFUSE_OTLP_AUTH:}
+spring:
+  ai:
+    chat:
+      observations:
+        log-prompt: true
+        log-completion: true

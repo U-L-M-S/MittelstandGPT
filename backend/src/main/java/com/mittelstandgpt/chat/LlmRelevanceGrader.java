@@ -1,10 +1,12 @@
 package com.mittelstandgpt.chat;
 
+import com.mittelstandgpt.observability.TokenCostMetrics;
 import java.util.List;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
@@ -41,9 +43,11 @@ public class LlmRelevanceGrader implements RelevanceGrader {
     private static final String SUFFICIENT_MARKER = "AUSREICHEND";
 
     private final ChatClient chatClient;
+    private final TokenCostMetrics metrics;
 
-    public LlmRelevanceGrader(ChatClient.Builder builder) {
+    public LlmRelevanceGrader(ChatClient.Builder builder, TokenCostMetrics metrics) {
         this.chatClient = builder.build();
+        this.metrics = metrics;
     }
 
     @Override
@@ -71,13 +75,22 @@ public class LlmRelevanceGrader implements RelevanceGrader {
         for (Document d : chunks) {
             ctx.append("- ").append(d.getText()).append('\n');
         }
-        String response =
+        ChatResponse chatResponse =
                 chatClient
                         .prompt()
                         .system(SUFFICIENCY_SYSTEM)
                         .user("Frage: " + question + "\n\nVorliegende Auszüge:\n" + ctx)
                         .call()
-                        .content();
+                        .chatResponse();
+        if (chatResponse != null && chatResponse.getMetadata() != null) {
+            metrics.record(chatResponse.getMetadata().getUsage());
+        }
+        String response =
+                chatResponse != null
+                                && chatResponse.getResult() != null
+                                && chatResponse.getResult().getOutput() != null
+                        ? chatResponse.getResult().getOutput().getText()
+                        : null;
         if (response == null || response.toUpperCase(Locale.ROOT).contains(SUFFICIENT_MARKER)) {
             return new Sufficiency(true, "");
         }

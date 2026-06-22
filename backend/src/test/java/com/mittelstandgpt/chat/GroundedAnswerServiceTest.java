@@ -5,6 +5,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.mittelstandgpt.observability.CostProperties;
+import com.mittelstandgpt.observability.TokenCostMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -18,7 +21,9 @@ class GroundedAnswerServiceTest {
         ChatClient.Builder builder = mock(ChatClient.Builder.class);
         when(builder.defaultSystem(anyString())).thenReturn(builder);
         when(builder.build()).thenReturn(mock(ChatClient.class));
-        return new GroundedAnswerService(builder);
+        TokenCostMetrics metrics =
+                new TokenCostMetrics(new SimpleMeterRegistry(), new CostProperties());
+        return new GroundedAnswerService(builder, metrics);
     }
 
     @Test

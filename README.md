@@ -153,6 +153,25 @@ Der Build bricht ab, wenn `MI_EVAL_MIN_FAITHFULNESS` (Standard 0,90) oder
 ist, lässt sich beweisen: `MI_RAG_SIMILARITY_THRESHOLD=1.0 mvn -Peval test`
 liefert keine Treffer → Trefferquote 0 → Build schlägt fehl.
 
+### Observability (Langfuse)
+
+Jede Chat-Anfrage erzeugt einen **Trace** mit den einzelnen Retrieval-Hops,
+Tool-/Modell-Aufrufen, Token-Zahlen, Latenz pro Schritt und geschätzten Kosten –
+sichtbar im **selbst-gehosteten Langfuse**. `docker compose up` startet Langfuse
+gleich mit (Postgres, ClickHouse, Redis, MinIO, web, worker); Dashboard unter
+http://localhost:3000 (Demo-Login `admin@mittelstandgpt.local` /
+`changeme-langfuse`). Die Telemetrie verlässt den Server **nicht**.
+
+- **DSGVO:** Prompt- und Antwort-**Inhalte** werden nur im Profil `dev`
+  exportiert, im Profil `prod` **nie** (nur Spans, Token, Latenz, Kosten). In der
+  Compose-Vorgabe ist `local,dev` aktiv; für den Produktivbetrieb `…,prod` setzen.
+- **Metriken:** Token- und Kostenzähler unter
+  http://localhost:8080/actuator/prometheus (`mittelstandgpt_tokens`,
+  `mittelstandgpt_cost_total`). Modellpreise via `MI_COST_INPUT_PER_1K` /
+  `MI_COST_OUTPUT_PER_1K` (Standard 0 – das lokale Modell ist kostenlos).
+- Der Langfuse-Stack ist ressourcenintensiv; die Kern-App hängt nicht von ihm ab
+  und läuft auch ohne ihn (der Trace-Export schlägt dann still fehl).
+
 ### Datenschutz / DSGVO / On-Premise
 
 - **Keine Cloud, keine externen Aufrufe.** LLM, Embeddings und Vektor-DB laufen
@@ -272,6 +291,20 @@ it is not a gate metric). The build fails below `MI_EVAL_MIN_FAITHFULNESS`
 (default 0.90) or `MI_EVAL_MIN_HITRATE` (default 0.80). The gate is real:
 `MI_RAG_SIMILARITY_THRESHOLD=1.0 mvn -Peval test` breaks retrieval → hit-rate 0 →
 build fails.
+
+### Observability (Langfuse)
+
+Every chat request produces one **trace** with the retrieval hops, tool/model
+calls, token counts, per-stage latency and estimated cost, viewable in
+**self-hosted Langfuse**. `docker compose up` also starts Langfuse (Postgres,
+ClickHouse, Redis, MinIO, web, worker); dashboard at http://localhost:3000 (demo
+login `admin@mittelstandgpt.local` / `changeme-langfuse`). Telemetry never leaves
+the server. Prompt/response **content** is exported only under the `dev` profile,
+never under `prod` (GDPR) — compose defaults to `local,dev`. Token and cost
+metrics are at http://localhost:8080/actuator/prometheus
+(`mittelstandgpt_tokens`, `mittelstandgpt_cost_total`); model prices via
+`MI_COST_INPUT_PER_1K` / `MI_COST_OUTPUT_PER_1K`. The core app does not depend on
+Langfuse and runs without it (trace export then fails silently).
 
 ### Privacy / GDPR
 

@@ -99,6 +99,24 @@ one is chosen by `spring.ai.model.chat`/`embedding` plus per-profile
 - The gate is real: `MI_RAG_SIMILARITY_THRESHOLD=1.0` breaks retrieval →
   hit-rate 0 → gate fails.
 
+## Observability (observability package)
+
+- Spring AI auto-emits observations for ChatClient/ChatModel/VectorStore/tools;
+  Micrometer Tracing → OpenTelemetry exports spans over OTLP/HTTP to self-hosted
+  Langfuse (`docker-compose.yml`).
+- Span export is opt-in via the `dev`/`prod` profile (`management.tracing.enabled`).
+  The default profile makes no export attempts (stays offline); Prometheus metrics
+  are always on at `/actuator/prometheus`.
+- `TokenCostMetrics` records `mittelstandgpt.tokens{type=input|output}` and
+  `mittelstandgpt.cost.total` (prices from `mi.cost.*`, default 0 = free local
+  model). Fed from `chatResponse().getMetadata().getUsage()` in
+  `GroundedAnswerService` and `LlmRelevanceGrader`.
+- GDPR: prompt/response CONTENT export (`spring.ai.chat.observations.log-prompt`/
+  `log-completion`) is OFF by default and under `prod`; ON only under `dev`.
+  `ProdTelemetryTest` guards this.
+- Langfuse can't be pulled/run in every sandbox (image rate limits); the compose
+  wiring is correct (validated with `docker compose config`) and wire-verified.
+
 ## Environment notes
 
 - Docker daemon may be remote/unavailable; use named volumes, not host bind

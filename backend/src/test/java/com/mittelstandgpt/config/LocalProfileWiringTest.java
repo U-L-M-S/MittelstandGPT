@@ -59,4 +59,19 @@ class LocalProfileWiringTest {
                 .as("Azure embedding model must be excluded under local")
                 .isEmpty();
     }
+
+    @Test
+    void telemetryContentExportIsOffByDefault() {
+        // GDPR-safe default: prompt/response content is not exported unless the
+        // `dev` profile explicitly enables it.
+        assertThat(
+                        context.getEnvironment()
+                                .getProperty("spring.ai.chat.observations.log-prompt", Boolean.class))
+                .isFalse();
+        assertThat(
+                        context.getEnvironment()
+                                .getProperty(
+                                        "spring.ai.chat.observations.log-completion", Boolean.class))
+                .isFalse();
+    }
 }
