@@ -1,0 +1,45 @@
+# Profile: local (default) — fully offline backend.
+# Local Ollama (chat + embeddings) + Qdrant vector store, all reachable on the
+# private Docker network. This profile must run with ZERO internet access — it is
+# the GDPR / on-prem selling point. Every endpoint/model is overridable via env.
+spring:
+  ai:
+    # Both the Ollama and Azure starters are on the classpath, so the active
+    # provider must be selected explicitly (otherwise their autoconfigurations,
+    # which both default to matchIfMissing=true, collide).
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      init:
+        # Models are pulled by the ollama-init container, never at app startup.
+        pull-model-strategy: never
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:qwen2.5:3b-instruct}
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      qdrant:
+        host: ${QDRANT_HOST:localhost}
+        port: ${QDRANT_PORT:6334} # gRPC port
+        collection-name: ${QDRANT_COLLECTION:mittelstandgpt}
+        initialize-schema: true # create the collection on startup if missing
+        use-tls: false
+  # Belt-and-braces in addition to the model switches above: keep the Azure
+  # backends inert so no Azure credentials are ever required to boot offline.
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.azure.openai.autoconfigure.AzureOpenAiChatAutoConfiguration
+      - org.springframework.ai.model.azure.openai.autoconfigure.AzureOpenAiEmbeddingAutoConfiguration
+      - org.springframework.ai.model.azure.openai.autoconfigure.AzureOpenAiImageAutoConfiguration
+      - org.springframework.ai.model.azure.openai.autoconfigure.AzureOpenAiAudioTranscriptionAutoConfiguration
+      - org.springframework.ai.vectorstore.azure.autoconfigure.AzureVectorStoreAutoConfiguration
+
+# Qdrant REST endpoint (separate from the gRPC port used by the vector store) —
+# used by the /api/health/ai connectivity check and the registry rebuild.
+app:
+  qdrant:
+    rest-url: http://${QDRANT_HOST:localhost}:6333

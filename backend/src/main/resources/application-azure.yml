@@ -1,0 +1,48 @@
+# Profile: azure (Workstream D) — provider-portable cloud backend.
+# Azure OpenAI (chat + embeddings) + Azure AI Search vector store. The agentic
+# RAG / eval / observability code is identical to the local profile: only this
+# configuration changes. Activate with SPRING_PROFILES_ACTIVE=azure.
+#
+# Requires LIVE Azure credentials, so this path cannot be exercised offline. All
+# values come from environment variables — never hardcode secrets/endpoints.
+# Pick an EU region for the Azure OpenAI resource for data residency (see README,
+# GDPR / data-residency trade-off).
+#
+# Note: nomic-embed-text (768-dim) and Azure text-embedding-3-* differ in
+# dimension, so this profile uses its OWN index. Switching profiles requires
+# re-embedding the corpus into the matching store/index.
+spring:
+  ai:
+    model:
+      chat: azure-openai
+      embedding: azure-openai
+    azure:
+      openai:
+        api-key: ${AZURE_OPENAI_API_KEY}
+        endpoint: ${AZURE_OPENAI_ENDPOINT}
+        chat:
+          options:
+            deployment-name: ${AZURE_OPENAI_CHAT_DEPLOYMENT:gpt-4o-mini}
+        embedding:
+          options:
+            deployment-name: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:text-embedding-3-small}
+    vectorstore:
+      type: azure
+      azure:
+        url: ${AZURE_AISEARCH_ENDPOINT}
+        api-key: ${AZURE_AISEARCH_API_KEY}
+        index-name: ${AZURE_AISEARCH_INDEX:mittelstandgpt}
+        initialize-schema: true
+  # Qdrant is selected by @ConditionalOnClass (not by spring.ai.vectorstore.type),
+  # so it would otherwise also activate here and create a second VectorStore bean —
+  # exclude it explicitly. Ollama chat/embedding are already off via the model
+  # switches above.
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration
+
+# The Qdrant REST URL is unused under this profile but kept resolvable so beans
+# wired for the local store still construct.
+app:
+  qdrant:
+    rest-url: ${QDRANT_REST_URL:http://localhost:6333}

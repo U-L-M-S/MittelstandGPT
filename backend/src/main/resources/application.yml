@@ -4,36 +4,20 @@ server:
 spring:
   application:
     name: mittelstandgpt
+  # Backend selection (Workstream D): `local` (default, fully offline Ollama+Qdrant)
+  # or `azure` (Azure OpenAI + Azure AI Search). Telemetry verbosity is an
+  # orthogonal dimension: optionally add `dev` (export prompt/response content) or
+  # `prod` (content export off, GDPR). Example: SPRING_PROFILES_ACTIVE=azure,prod
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   servlet:
     multipart:
-      # Generous limits for document uploads (Phase 2)
+      # Generous limits for document uploads.
       max-file-size: 50MB
       max-request-size: 50MB
 
-  # --- Spring AI: all wired to the local Ollama + Qdrant containers ---
-  # Every endpoint/model is overridable via environment variables so the
-  # infrastructure and models can be swapped without code changes.
-  ai:
-    ollama:
-      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
-      init:
-        # Models are pulled by the ollama-init container, never at app startup.
-        pull-model-strategy: never
-      chat:
-        options:
-          model: ${OLLAMA_CHAT_MODEL:qwen2.5:3b-instruct}
-      embedding:
-        options:
-          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
-    vectorstore:
-      qdrant:
-        host: ${QDRANT_HOST:localhost}
-        port: ${QDRANT_PORT:6334} # gRPC port
-        collection-name: ${QDRANT_COLLECTION:mittelstandgpt}
-        initialize-schema: true # create the collection on startup if missing
-        use-tls: false
-
-# Actuator: only expose health/info. Used by the Docker healthcheck.
+# Actuator: health/info for the Docker healthcheck. Metrics/prometheus and trace
+# export are added in the observability milestone.
 management:
   endpoints:
     web:
@@ -44,10 +28,8 @@ management:
       probes:
         enabled: true
       show-details: never
-
-# Application-specific settings.
-app:
-  qdrant:
-    # Qdrant REST endpoint (separate from the gRPC port used by the vector
-    # store) — used by the /api/health/ai connectivity check.
-    rest-url: http://${QDRANT_HOST:localhost}:6333
+  # The Micrometer tracing bridge + OTLP exporter are on the classpath, but tracing
+  # and span export stay OFF here so application behaviour is unchanged. The
+  # observability milestone enables this and points it at self-hosted Langfuse.
+  tracing:
+    enabled: false

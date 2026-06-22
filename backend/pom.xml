@@ -66,6 +66,34 @@
             <artifactId>spring-ai-starter-vector-store-qdrant</artifactId>
         </dependency>
 
+        <!-- Provider portability (Workstream D): Azure OpenAI chat/embeddings +
+             Azure AI Search. On the classpath in every build, but their
+             autoconfiguration is activated only by the `azure` Spring profile
+             (see application-azure.yml). The default `local` profile excludes
+             them, so behaviour and the fully-offline guarantee are unchanged. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-azure-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-azure</artifactId>
+        </dependency>
+
+        <!-- Observability (Workstream C): Micrometer Tracing → OpenTelemetry,
+             exported over OTLP/HTTP to self-hosted Langfuse. Versions managed by
+             the Spring Boot / OpenTelemetry BOMs. Spans are emitted in every
+             profile; whether prompt/response *content* is exported is gated by
+             profile (dev only) for GDPR — see application*.yml. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+
         <!-- Document parsing: Tika (DOCX/TXT/…) and page-aware PDF reader -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
